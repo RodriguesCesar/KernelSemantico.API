@@ -1,0 +1,16 @@
+services:
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest #Imagem do SqlServer
+    container_name: sqlserver_db #Nome do container no Docker
+    restart: always #Inicializar automaticamente
+    environment:
+      SA_PASSWORD: "Coti@2026" #Senha do banco
+      ACCEPT_EULA: "Y" #Confirmar a instalação do banco
+    ports:
+      - "1434:1433" #Portas
+    volumes:
+      - sqlserver_data:/var/opt/mssql #Local para salvar os arquivos
+
+volumes:
+  sqlserver_data:

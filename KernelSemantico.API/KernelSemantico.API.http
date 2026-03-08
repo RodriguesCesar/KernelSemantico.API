@@ -1,0 +1,6 @@
+@KernelSemantico.API_HostAddress = http://localhost:5047
+
+GET {{KernelSemantico.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
