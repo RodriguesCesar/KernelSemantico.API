@@ -56,6 +56,8 @@ builder.Services.AddHttpClient<OpenAiEmbeddingService>(client =>
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 
+builder.Services.AddSingleton<RagTelemetry>();
+builder.Services.AddScoped<PromptGuardService>();
 builder.Services.AddScoped<IVectorStore, PgVectorStore>();
 builder.Services.AddHostedService<RagVectorStoreInitializer>();
 
