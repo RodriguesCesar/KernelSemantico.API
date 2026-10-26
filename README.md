@@ -12,9 +12,9 @@ Configure a chave da OpenAI por uma destas opções:
 2. User Secrets (`dotnet user-secrets`)
 3. Arquivo local `KernelSemantico.API/appsettings.Local.json` (não versionado)
 
-## Configuração do RAG (Fase 2)
+## Configuração do RAG (Fase 2 + Fase 3)
 
-A Fase 2 usa PostgreSQL com extensão pgvector para persistir embeddings.
+A API usa PostgreSQL com extensão pgvector para persistir embeddings.
 
 ### 1) Subir um PostgreSQL com pgvector (exemplo Docker)
 
@@ -36,7 +36,16 @@ Exemplo de `KernelSemantico.API/appsettings.Local.json`:
     "EmbeddingModel": "text-embedding-3-small",
     "EmbeddingDimensions": 1536,
     "VectorWeight": 0.7,
-    "KeywordWeight": 0.3
+    "KeywordWeight": 0.3,
+    "Guardrails": {
+      "MaxQuestionLength": 2000,
+      "MaxDocumentLength": 50000,
+      "BlockedPatterns": [
+        "ignore previous instructions",
+        "system prompt",
+        "jailbreak"
+      ]
+    }
   }
 }
 ```
@@ -101,8 +110,73 @@ Resposta esperada:
 }
 ```
 
+### Avaliação RAG
+- `POST /api/rag/evaluate`
+
+Body:
+
+```json
+{
+  "topK": 3,
+  "cases": [
+    {
+      "id": "ferias-1",
+      "question": "Quantos dias posso parcelar minhas férias?",
+      "expectedContains": "30",
+      "expectedSourceDocumentId": "politica-ferias"
+    }
+  ]
+}
+```
+
+Resposta esperada (resumo):
+
+```json
+{
+  "totalCases": 1,
+  "passedCases": 1,
+  "failedCases": 0,
+  "blockedCases": 0,
+  "averageLatencyMs": 412.75,
+  "results": [
+    {
+      "id": "ferias-1",
+      "passed": true,
+      "blocked": false,
+      "hasSources": true,
+      "expectedTextFound": true,
+      "expectedSourceFound": true,
+      "latencyMs": 412.75,
+      "reason": "OK",
+      "answerSnippet": "...",
+      "sources": []
+    }
+  ]
+}
+```
+
+## Observabilidade (Fase 3)
+
+A API agora publica instrumentação via `System.Diagnostics`:
+
+- ActivitySource: `KernelSemantico.API.Rag`
+- Meter: `KernelSemantico.API.Rag`
+
+Métricas principais:
+- `rag_ingest_requests_total`
+- `rag_ingest_errors_total`
+- `rag_ingest_duration_ms`
+- `rag_ask_requests_total`
+- `rag_ask_errors_total`
+- `rag_guardrail_blocked_total`
+- `rag_ask_duration_ms`
+- `rag_retrieval_candidate_count`
+- `rag_evaluate_requests_total`
+- `rag_evaluate_errors_total`
+- `rag_evaluate_duration_ms`
+
 ## Próximos passos recomendados
 
-- Adicionar filtros de autorização por tenant/documento
-- Adicionar reranking e citações com trechos destacados
-- Adicionar avaliação automatizada (groundedness, latência, custo)
+- Expor essas métricas para Prometheus/OpenTelemetry exporter
+- Adicionar autorização por tenant/documento
+- Adicionar avaliação contínua em CI com dataset versionado
