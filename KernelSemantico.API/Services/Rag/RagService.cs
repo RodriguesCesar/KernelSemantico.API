@@ -5,63 +5,117 @@ using KernelSemantico.API.Services;
 
 namespace KernelSemantico.API.Services.Rag;
 
-public class RagService(AgentService agentService, InMemoryRagStore store)
+public class RagService(
+    AgentService agentService,
+    IVectorStore vectorStore,
+    OpenAiEmbeddingService embeddingService,
+    IConfiguration configuration)
 {
-    public int Ingest(IngestDocumentRequest request)
-    {
-        var chunks = ChunkDocument(request.documentId, request.title, request.content)
-            .Select((content, index) => new DocumentChunk(request.documentId, request.title, index + 1, content));
+    private readonly double _vectorWeight = configuration.GetValue<double?>("Rag:VectorWeight") ?? 0.7;
+    private readonly double _keywordWeight = configuration.GetValue<double?>("Rag:KeywordWeight") ?? 0.3;
 
-        return store.UpsertDocument(request.documentId, chunks);
+    public async Task<int> Ingest(IngestDocumentRequest request, CancellationToken cancellationToken = default)
+    {
+        var chunkContents = ChunkDocument(request.content);
+
+        var chunks = new List<VectorChunkInput>(chunkContents.Count);
+        for (var i = 0; i < chunkContents.Count; i++)
+        {
+            var content = chunkContents[i];
+            var embedding = await embeddingService.GenerateEmbeddingAsync(content, cancellationToken);
+            chunks.Add(new VectorChunkInput(
+                request.documentId,
+                request.title,
+                i + 1,
+                content,
+                embedding
+            ));
+        }
+
+        return await vectorStore.UpsertDocumentChunksAsync(request.documentId, chunks, cancellationToken);
     }
 
-    public async Task<RagAnswerResponse> Ask(RagAskRequest request)
+    public async Task<RagAnswerResponse> Ask(RagAskRequest request, CancellationToken cancellationToken = default)
     {
         var topK = Math.Clamp(request.topK, 1, 10);
-        var retrieved = Retrieve(request.message, topK);
 
-        if (retrieved.Count == 0)
+        var queryEmbedding = await embeddingService.GenerateEmbeddingAsync(request.message, cancellationToken);
+        var candidates = await vectorStore.SearchAsync(queryEmbedding, Math.Max(topK * 5, 15), cancellationToken);
+
+        if (candidates.Count == 0)
             return new RagAnswerResponse("Não encontrei contexto suficiente para responder com segurança.", []);
 
-        var context = BuildContext(retrieved);
+        var ranked = RankHybrid(request.message, candidates, topK);
+        var context = BuildContext(ranked);
+
         var answer = await agentService.AskWithContext(request.message, context);
 
-        var sources = retrieved
-            .Select(x => new SourceReference(x.DocumentId, x.Title, x.ChunkIndex))
-            .Distinct()
+        var sources = ranked
+            .Select(x => new SourceReference(x.DocumentId, x.Title, x.ChunkIndex, Math.Round(x.HybridScore, 4)))
             .ToList();
 
         return new RagAnswerResponse(answer, sources);
     }
 
-    private IReadOnlyList<DocumentChunk> Retrieve(string query, int topK)
+    private IReadOnlyList<RankedChunk> RankHybrid(string query, IReadOnlyList<RetrievedChunk> candidates, int topK)
     {
         var queryTerms = Tokenize(query).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (queryTerms.Count == 0)
-            return [];
 
-        return store.GetAll()
-            .Select(chunk => new
+        var (vectorWeight, keywordWeight) = NormalizeWeights(_vectorWeight, _keywordWeight);
+
+        var ranked = candidates
+            .Select(chunk =>
             {
-                Chunk = chunk,
-                Score = Tokenize(chunk.Content).Count(term => queryTerms.Contains(term))
+                var contentTerms = Tokenize(chunk.Content).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var keywordHits = queryTerms.Count == 0
+                    ? 0
+                    : queryTerms.Count(term => contentTerms.Contains(term));
+
+                var keywordScore = queryTerms.Count == 0
+                    ? 0
+                    : (double)keywordHits / queryTerms.Count;
+
+                var hybridScore = (chunk.VectorScore * vectorWeight) + (keywordScore * keywordWeight);
+
+                return new RankedChunk(
+                    chunk.DocumentId,
+                    chunk.Title,
+                    chunk.ChunkIndex,
+                    chunk.Content,
+                    chunk.VectorScore,
+                    keywordScore,
+                    hybridScore
+                );
             })
-            .Where(x => x.Score > 0)
-            .OrderByDescending(x => x.Score)
-            .ThenBy(x => x.Chunk.ChunkIndex)
+            .OrderByDescending(x => x.HybridScore)
+            .ThenByDescending(x => x.VectorScore)
+            .ThenBy(x => x.ChunkIndex)
             .Take(topK)
-            .Select(x => x.Chunk)
             .ToList();
+
+        return ranked;
     }
 
-    private static string BuildContext(IReadOnlyList<DocumentChunk> chunks)
+    private static (double vectorWeight, double keywordWeight) NormalizeWeights(double vectorWeight, double keywordWeight)
+    {
+        if (vectorWeight < 0 || keywordWeight < 0)
+            return (0.7, 0.3);
+
+        var total = vectorWeight + keywordWeight;
+        if (total <= 0)
+            return (0.7, 0.3);
+
+        return (vectorWeight / total, keywordWeight / total);
+    }
+
+    private static string BuildContext(IReadOnlyList<RankedChunk> chunks)
     {
         var sb = new StringBuilder();
 
         for (var i = 0; i < chunks.Count; i++)
         {
             var chunk = chunks[i];
-            sb.AppendLine($"[Fonte {i + 1}] DocumentId={chunk.DocumentId}; Título={chunk.Title}; Trecho={chunk.ChunkIndex}");
+            sb.AppendLine($"[Fonte {i + 1}] DocumentId={chunk.DocumentId}; Título={chunk.Title}; Trecho={chunk.ChunkIndex}; Score={chunk.HybridScore:F4}");
             sb.AppendLine(chunk.Content);
             sb.AppendLine();
         }
@@ -69,27 +123,8 @@ public class RagService(AgentService agentService, InMemoryRagStore store)
         return sb.ToString();
     }
 
-    private static IEnumerable<string> Tokenize(string text)
+    private static IReadOnlyList<string> ChunkDocument(string content)
     {
-        if (string.IsNullOrWhiteSpace(text))
-            return [];
-
-        var separators = new[]
-        {
-            ' ', '\n', '\r', '\t', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'', '-', '_', '/', '\\'
-        };
-
-        return text
-            .Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(x => x.Length > 2)
-            .Select(x => x.ToLowerInvariant());
-    }
-
-    private static IEnumerable<string> ChunkDocument(string documentId, string title, string content)
-    {
-        _ = documentId;
-        _ = title;
-
         const int maxChunkLength = 700;
         const int overlap = 120;
 
@@ -118,4 +153,30 @@ public class RagService(AgentService agentService, InMemoryRagStore store)
 
         return chunks;
     }
+
+    private static IEnumerable<string> Tokenize(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return [];
+
+        var separators = new[]
+        {
+            ' ', '\n', '\r', '\t', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'', '-', '_', '/', '\\'
+        };
+
+        return text
+            .Split(separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => x.Length > 2)
+            .Select(x => x.ToLowerInvariant());
+    }
+
+    private sealed record RankedChunk(
+        string DocumentId,
+        string Title,
+        int ChunkIndex,
+        string Content,
+        double VectorScore,
+        double KeywordScore,
+        double HybridScore
+    );
 }

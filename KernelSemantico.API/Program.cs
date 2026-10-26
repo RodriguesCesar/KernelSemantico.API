@@ -23,8 +23,8 @@ builder.Services.AddDbContext<AppDbContext>
 builder.Services.AddScoped<ClientePlugin>();
 
 //Configuração do Microsoft Kernel
-builder.Services.AddScoped(sp => {
-
+builder.Services.AddScoped(sp =>
+{
     var model = configuration["OpenAI:Model"];
     var apiKey = configuration["OpenAI:ApiKey"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 
@@ -50,7 +50,14 @@ builder.Services.AddScoped(sp => {
     return kernel;
 });
 
-builder.Services.AddSingleton<InMemoryRagStore>();
+builder.Services.AddHttpClient<OpenAiEmbeddingService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.openai.com/v1/");
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+
+builder.Services.AddScoped<IVectorStore, PgVectorStore>();
+builder.Services.AddHostedService<RagVectorStoreInitializer>();
 
 //Injeção de dependência do Agente
 builder.Services.AddScoped<AgentService>();
