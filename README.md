@@ -177,14 +177,14 @@ Métricas principais:
 
 ## CI/CD (GitHub Actions)
 
-Status atual: **ainda não há pipeline configurada** neste repositório (0 workflows no GitHub Actions).
+Status atual: **pipeline de CI implementada** em `.github/workflows/ci.yml`.
 
-Pipeline recomendada para próxima fase:
+A pipeline executa em `push` e `pull_request` para `master` (além de `workflow_dispatch`) com os passos:
 
-1. `dotnet restore`
+1. `dotnet restore` da solução
 2. `dotnet build --configuration Release --no-restore`
-3. `dotnet test --configuration Release --no-build`
-4. (Opcional) executar casos de `/api/rag/evaluate` em ambiente controlado
+3. `dotnet test` para projetos de teste detectados automaticamente
+   - se não houver projeto de teste no repositório, a etapa de testes é pulada sem falha
 
 ## Próximos passos recomendados
 
