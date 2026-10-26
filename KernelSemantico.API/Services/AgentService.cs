@@ -1,16 +1,29 @@
-﻿using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 namespace KernelSemantico.API.Services
 {
-    public class AgentService (Kernel kernel)
+    public class AgentService(Kernel kernel)
     {
         /*
          *  Método para executar o agente
          */
         public async Task<string> Ask(string message)
         {
+            return await AskInternal(message, null);
+        }
+
+        public async Task<string> AskWithContext(string message, string? context)
+        {
+            return await AskInternal(message, context);
+        }
+
+        private async Task<string> AskInternal(string message, string? context)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                throw new ArgumentException("A mensagem é obrigatória.", nameof(message));
+
             //Integração com a OpenAI
             var chat = kernel.GetRequiredService<IChatCompletionService>();
             var history = new ChatHistory();
@@ -23,15 +36,18 @@ namespace KernelSemantico.API.Services
                     - criar clientes
                     - buscar clientes
                     Sempre use as funções disponíveis para responder.
+                    Quando receber contexto de documentos, use esse contexto como fonte principal.
+                    Se a pergunta não puder ser respondida com o contexto recebido, diga claramente que faltam dados.
                 """);
+
+            if (!string.IsNullOrWhiteSpace(context))
+                history.AddSystemMessage($"""
+                    Contexto recuperado para responder ao usuário:
+                    {context}
+                    """);
 
             //Adicionando a mensagem que será enviada para a IA
             history.AddUserMessage(message);
-
-            //Registrando os plugins do agente
-            //var criarCliente = kernel.Plugins["ClientePlugin"]["CriarCliente"];
-            //var listarClientes = kernel.Plugins["ClientePlugin"]["ListarClientes"];
-            //var buscarCliente = kernel.Plugins["ClientePlugin"]["BuscarCliente"];
 
             //Executando o prompt
             var result = await chat.GetChatMessageContentAsync(history,
@@ -39,11 +55,6 @@ namespace KernelSemantico.API.Services
                 {
                     //Passar os plugins (KernelFuncion)
                     ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
-                    //ToolCallBehavior = ToolCallBehavior.EnableKernelFunctions(
-                    //        criarCliente,
-                    //        listarClientes,
-                    //        buscarCliente
-                    //   )
                 }, kernel);
 
             //Retornar a resposta da IA

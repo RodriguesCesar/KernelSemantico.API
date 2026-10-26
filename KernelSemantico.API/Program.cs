@@ -1,6 +1,7 @@
 using KernelSemantico.API.Data;
 using KernelSemantico.API.Plugins;
 using KernelSemantico.API.Services;
+using KernelSemantico.API.Services.Rag;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 //Objeto para ler o appsetings.json
 var configuration = builder.Configuration;
@@ -21,15 +24,21 @@ builder.Services.AddScoped<ClientePlugin>();
 
 //Configuração do Microsoft Kernel
 builder.Services.AddScoped(sp => {
-    
+
     var model = configuration["OpenAI:Model"];
-    var apiKey = configuration["OpenAI:ApiKey"];
+    var apiKey = configuration["OpenAI:ApiKey"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+    if (string.IsNullOrWhiteSpace(model))
+        throw new InvalidOperationException("OpenAI:Model não configurado.");
+
+    if (string.IsNullOrWhiteSpace(apiKey))
+        throw new InvalidOperationException("OpenAI:ApiKey não configurada. Use User Secrets, appsettings.Local.json ou OPENAI_API_KEY.");
 
     var kernelBuilder = Kernel.CreateBuilder();
 
     kernelBuilder.AddOpenAIChatCompletion(
-            modelId : model, //Modelo da LLM da OpenAI
-            apiKey: apiKey //Chave de autenticação
+            modelId: model,
+            apiKey: apiKey
         );
 
     var kernel = kernelBuilder.Build();
@@ -41,8 +50,11 @@ builder.Services.AddScoped(sp => {
     return kernel;
 });
 
+builder.Services.AddSingleton<InMemoryRagStore>();
+
 //Injeção de dependência do Agente
 builder.Services.AddScoped<AgentService>();
+builder.Services.AddScoped<RagService>();
 
 var app = builder.Build();
 

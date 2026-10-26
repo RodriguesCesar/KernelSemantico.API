@@ -1,6 +1,5 @@
-﻿using KernelSemantico.API.Models.Request;
+using KernelSemantico.API.Models.Request;
 using KernelSemantico.API.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KernelSemantico.API.Controllers;
