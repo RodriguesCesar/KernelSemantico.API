@@ -9,22 +9,22 @@ namespace KernelSemantico.API.Controllers;
 public class RagController(RagService ragService) : ControllerBase
 {
     [HttpPost("ingest")]
-    public IActionResult Ingest([FromBody] IngestDocumentRequest request)
+    public async Task<IActionResult> Ingest([FromBody] IngestDocumentRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.documentId) || string.IsNullOrWhiteSpace(request.title) || string.IsNullOrWhiteSpace(request.content))
             return BadRequest("documentId, title e content são obrigatórios.");
 
-        var chunks = ragService.Ingest(request);
+        var chunks = await ragService.Ingest(request, cancellationToken);
         return Ok(new { message = "Documento ingerido com sucesso.", chunks });
     }
 
     [HttpPost("ask")]
-    public async Task<IActionResult> Ask([FromBody] RagAskRequest request)
+    public async Task<IActionResult> Ask([FromBody] RagAskRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.message))
             return BadRequest("message é obrigatório.");
 
-        var response = await ragService.Ask(request);
+        var response = await ragService.Ask(request, cancellationToken);
         return Ok(response);
     }
 }
