@@ -32,7 +32,7 @@ Exemplo de `KernelSemantico.API/appsettings.Local.json`:
     "ApiKey": "sua-chave-aqui"
   },
   "Rag": {
-    "ConnectionString": "Host=localhost;Port=5432;Database=ragdb;Username=postgres;Password=postgres",
+    "ConnectionString": "Host=localhost;Port=5432;Database=ragdb;Username=postgres;******",
     "EmbeddingModel": "text-embedding-3-small",
     "EmbeddingDimensions": 1536,
     "VectorWeight": 0.7,
@@ -174,6 +174,17 @@ Métricas principais:
 - `rag_evaluate_requests_total`
 - `rag_evaluate_errors_total`
 - `rag_evaluate_duration_ms`
+
+## CI/CD (GitHub Actions)
+
+Status atual: **ainda não há pipeline configurada** neste repositório (0 workflows no GitHub Actions).
+
+Pipeline recomendada para próxima fase:
+
+1. `dotnet restore`
+2. `dotnet build --configuration Release --no-restore`
+3. `dotnet test --configuration Release --no-build`
+4. (Opcional) executar casos de `/api/rag/evaluate` em ambiente controlado
 
 ## Próximos passos recomendados
 
