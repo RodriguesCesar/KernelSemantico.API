@@ -1,6 +1,8 @@
 # KernelSemantico.API
 
 [![CI](https://github.com/RodriguesCesar/KernelSemantico.API/actions/workflows/ci.yml/badge.svg)](https://github.com/RodriguesCesar/KernelSemantico.API/actions/workflows/ci.yml)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![Release](https://img.shields.io/github/v/release/RodriguesCesar/KernelSemantico.API?display_name=tag)](https://github.com/RodriguesCesar/KernelSemantico.API/releases)
 
 API .NET com Semantic Kernel para cenários de agente e RAG com pgvector.
 
