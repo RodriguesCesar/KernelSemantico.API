@@ -50,13 +50,22 @@ Exemplo de `KernelSemantico.API/appsettings.Local.json`:
         "jailbreak"
       ]
     }
+  },
+  "OpenTelemetry": {
+    "ServiceName": "KernelSemantico.API",
+    "Otlp": {
+      "Endpoint": "http://localhost:4317",
+      "Protocol": "grpc"
+    }
   }
 }
 ```
 
-Alternativa via variável de ambiente para o banco vetorial:
+Alternativa por variáveis de ambiente:
 
 - `RAG_VECTOR_DB_CONNECTION`
+- `OTEL_EXPORTER_OTLP_ENDPOINT`
+- `OTEL_EXPORTER_OTLP_PROTOCOL` (`grpc` ou `http/protobuf`)
 
 > A API cria/garante automaticamente tabela e índice vetorial no startup.
 
@@ -159,14 +168,15 @@ Resposta esperada (resumo):
 }
 ```
 
-## Observabilidade (Fase 3)
+## Observabilidade (Fase 3 + OpenTelemetry)
 
-A API agora publica instrumentação via `System.Diagnostics`:
+A API publica instrumentação via `System.Diagnostics` e exporta via OTLP.
 
-- ActivitySource: `KernelSemantico.API.Rag`
-- Meter: `KernelSemantico.API.Rag`
+Sinais exportados:
+- Traces (`AspNetCore`, `HttpClient`, `KernelSemantico.API.Rag`)
+- Metrics (`AspNetCore`, `HttpClient`, `Runtime`, `KernelSemantico.API.Rag`)
 
-Métricas principais:
+Métricas RAG principais:
 - `rag_ingest_requests_total`
 - `rag_ingest_errors_total`
 - `rag_ingest_duration_ms`
@@ -192,6 +202,6 @@ A pipeline executa em `push` e `pull_request` para `master` (além de `workflow_
 
 ## Próximos passos recomendados
 
-- Expor essas métricas para Prometheus/OpenTelemetry exporter
 - Adicionar autorização por tenant/documento
 - Adicionar avaliação contínua em CI com dataset versionado
+- Publicar dashboard (Grafana/Jaeger/Tempo) para operação do RAG
