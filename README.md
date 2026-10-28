@@ -1,5 +1,7 @@
 # KernelSemantico.API
 
+[![CI](https://github.com/RodriguesCesar/KernelSemantico.API/actions/workflows/ci.yml/badge.svg)](https://github.com/RodriguesCesar/KernelSemantico.API/actions/workflows/ci.yml)
+
 API .NET com Semantic Kernel para cenários de agente e RAG com pgvector.
 
 ## Segurança de segredos
