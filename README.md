@@ -189,6 +189,27 @@ Métricas RAG principais:
 - `rag_evaluate_errors_total`
 - `rag_evaluate_duration_ms`
 
+### Stack local de observabilidade
+
+Foi adicionado um stack local em `docker-compose.observability.yml` com:
+
+- OTel Collector (OTLP receiver + export de traces e métricas)
+- Jaeger (visualização de traces)
+- Prometheus (coleta de métricas)
+- Grafana (dashboards)
+
+Subir stack:
+
+```bash
+docker compose -f docker-compose.observability.yml up -d
+```
+
+Acessos locais:
+
+- Grafana: `http://localhost:3000` (admin/admin)
+- Jaeger: `http://localhost:16686`
+- Prometheus: `http://localhost:9090`
+
 ## CI/CD (GitHub Actions)
 
 Status atual: **pipeline de CI implementada** em `.github/workflows/ci.yml`.
@@ -204,4 +225,4 @@ A pipeline executa em `push` e `pull_request` para `master` (além de `workflow_
 
 - Adicionar autorização por tenant/documento
 - Adicionar avaliação contínua em CI com dataset versionado
-- Publicar dashboard (Grafana/Jaeger/Tempo) para operação do RAG
+- Publicar dashboard customizado no Grafana para SLOs do RAG
