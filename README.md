@@ -210,6 +210,13 @@ Acessos locais:
 - Jaeger: `http://localhost:16686`
 - Prometheus: `http://localhost:9090`
 
+Dashboard provisionado automaticamente:
+
+- `KernelSemantico / RAG Overview`
+- Arquivo: `observability/grafana/dashboards/rag-overview.json`
+
+> Se o stack já estiver rodando, reinicie o serviço do Grafana para forçar o re-load das provisões.
+
 ## CI/CD (GitHub Actions)
 
 Status atual: **pipeline de CI implementada** em `.github/workflows/ci.yml`.
