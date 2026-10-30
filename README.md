@@ -16,7 +16,7 @@ Configure a chave da OpenAI por uma destas opções:
 2. User Secrets (`dotnet user-secrets`)
 3. Arquivo local `KernelSemantico.API/appsettings.Local.json` (não versionado)
 
-## Configuração do RAG (Fase 2 + Fase 3)
+## Configuração do RAG 
 
 A API usa PostgreSQL com extensão pgvector para persistir embeddings.
 
@@ -168,7 +168,7 @@ Resposta esperada (resumo):
 }
 ```
 
-## Observabilidade (Fase 3 + OpenTelemetry)
+## Observabilidade 
 
 A API publica instrumentação via `System.Diagnostics` e exporta via OTLP.
 
